@@ -5,11 +5,13 @@ import (
   "bufio"
   "strings"
   "fmt"
- )
+)
+
+const tomb = "~"
 
 func Set(db string, key string, value string) error {
 
-  f, err := os.OpenFile(db, os.O_APPEND|os.O_WRONLY|os.O_CREATE, os.ModeAppend)
+  f, err := os.OpenFile(db, os.O_APPEND|os.O_WRONLY|os.O_CREATE, os.ModeAppend | 0644)
   if err != nil {
     return err
   }
@@ -30,6 +32,10 @@ func Set(db string, key string, value string) error {
   return nil
 }
 
+func notFound(key string) (string, error){
+  return "", fmt.Errorf("key not found: %s", key)
+}
+
 func Get(db string, key string) (string, error) {
   f, err := os.Open(db)
   if err != nil {
@@ -38,7 +44,7 @@ func Get(db string, key string) (string, error) {
   defer f.Close()
 
   scanner := bufio.NewScanner(f)
-  res, err := "", fmt.Errorf("key not found: %s", key)
+  res, err := notFound(key)
   for scanner.Scan() {
     record := scanner.Text()
     s := strings.Split(record, " ")
@@ -49,7 +55,14 @@ func Get(db string, key string) (string, error) {
   if err := scanner.Err(); err != nil {
 	  return "", err
   }
+  if res == tomb {
+    return notFound(key)
+  }
   return res, err
+}
+
+func Del(db string, key string) error {
+  return Set(db, key, tomb)
 }
 
 func main() {
@@ -59,6 +72,8 @@ func main() {
     case "get":
       s, _ := Get(args[1], args[2])
       fmt.Println(s)
+    case "del":
+      Del(args[1], args[2])
     default:
       panic(fmt.Sprintf("unknown command: %s", args[0]))
   }
